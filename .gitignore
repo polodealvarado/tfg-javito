@@ -1,3 +1,5 @@
 # Folders
 **/.venv
 **/.python-version
+**/wandb
+**/results

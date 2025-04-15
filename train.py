@@ -9,7 +9,7 @@ from evaluate import load
 import numpy as np
 import wandb
 from loguru import logger
-from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.metrics import classification_report
 import pandas as pd
 
 
@@ -40,9 +40,6 @@ def compute_metrics(eval_pred):
             predictions=predictions, references=labels, average="weighted"
         )
     )
-
-    # Compute confusion matrix
-    cm = confusion_matrix(labels, predictions)
 
     # Get per-class metrics
     class_report = classification_report(labels, predictions, output_dict=True)

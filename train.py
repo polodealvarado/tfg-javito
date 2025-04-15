@@ -9,6 +9,8 @@ from evaluate import load
 import numpy as np
 import wandb
 from loguru import logger
+from sklearn.metrics import confusion_matrix, classification_report
+import pandas as pd
 
 
 def compute_metrics(eval_pred):
@@ -16,7 +18,7 @@ def compute_metrics(eval_pred):
     predictions, labels = eval_pred
     predictions = np.argmax(predictions, axis=1)
 
-    # Load and compute metrics
+    # Global metrics
     accuracy_metric = load("accuracy")
     f1_metric = load("f1")
     precision_metric = load("precision")
@@ -39,6 +41,20 @@ def compute_metrics(eval_pred):
         )
     )
 
+    # Compute confusion matrix
+    cm = confusion_matrix(labels, predictions)
+
+    # Get per-class metrics
+    class_report = classification_report(labels, predictions, output_dict=True)
+
+    # Add per-class metrics to wandb
+    for class_id in range(5):  # 5 classes (0 to 4)
+        class_metrics = class_report[str(class_id)]
+        metrics[f"class_{class_id}_precision"] = class_metrics["precision"]
+        metrics[f"class_{class_id}_recall"] = class_metrics["recall"]
+        metrics[f"class_{class_id}_f1"] = class_metrics["f1-score"]
+        metrics[f"class_{class_id}_support"] = class_metrics["support"]
+
     return metrics
 
 
@@ -60,29 +76,41 @@ def main():
 
     # Tokenize function
     def tokenize_function(examples):
-        return tokenizer(
+        tokenized = tokenizer(
             examples["text"], padding="max_length", truncation=True, max_length=512
         )
+        # Include labels in the returned dictionary
+        tokenized["labels"] = examples["label"]
+        return tokenized
 
     # Tokenize dataset
     logger.info("Tokenizing dataset...")
+    # Remove all columns except 'text' and 'label'
+    columns_to_remove = [
+        col for col in dataset["train"].column_names if col not in ["text", "label"]
+    ]
     tokenized_dataset = dataset.map(
-        tokenize_function, batched=True, remove_columns=dataset["train"].column_names
+        tokenize_function, batched=True, remove_columns=columns_to_remove
     )
 
     # Training arguments
     training_args = TrainingArguments(
         output_dir="./results",
+        run_name="distilbert-amazon-reviews",  # Add a distinct run name
         learning_rate=2e-5,
         per_device_train_batch_size=8,
         per_device_eval_batch_size=8,
-        num_train_epochs=3,
+        num_train_epochs=1,
         weight_decay=0.01,
-        evaluation_strategy="epoch",
-        save_strategy="epoch",
+        eval_strategy="steps",  # Changed from "epoch" to "steps"
+        eval_steps=1000,  # Added: evaluate every 1000 steps
+        save_strategy="steps",  # Changed to match evaluation_strategy
+        save_steps=1000,  # Added: save every 1000 steps
         load_best_model_at_end=True,
         push_to_hub=False,
         report_to="wandb",
+        logging_strategy="steps",  # Added: ensure logging matches evaluation
+        logging_steps=1000,  # Added: log every 1000 steps
     )
 
     # Initialize Trainer

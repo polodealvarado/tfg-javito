@@ -104,6 +104,7 @@ def main():
         save_strategy="steps",  # Changed to match evaluation_strategy
         save_steps=1000,  # Added: save every 1000 steps
         load_best_model_at_end=True,
+        use_mps_device=True,
         push_to_hub=False,
         report_to="wandb",
         logging_strategy="steps",  # Added: ensure logging matches evaluation
